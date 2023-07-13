@@ -21,10 +21,6 @@ using f64 = double;
 using u8 = uint8_t;
 
 constexpr int NUM_CHANNELS = 3;
-constexpr int NUM_CLUSTERS = FLAG_NUM_CLUSTERS;
-constexpr int STRIP_IMAGE_WIDTH = 200;
-constexpr int STRIP_IMAGE_HEIGHT_PER_CLUSTER = 100;
-constexpr int STRIP_IMAGE_HEIGHT = STRIP_IMAGE_HEIGHT_PER_CLUSTER * NUM_CLUSTERS;
 constexpr f64 NORMALIZE_COLOR_FACTOR = 1.0 / 255;
 
 using Color = std::array<f64, 3>;
@@ -71,16 +67,18 @@ struct ClusterResult {
   std::vector<Color> mean_color_of_cluster;
   std::vector<uint32_t> cluster_of_pixel;
   std::vector<uint32_t> nth_cluster; // Clusters sorted by population in decreasing order
- 
+
   uint32_t num_clusters;
 
-  ClusterResult(uint32_t num_clusters) : 
-      nth_cluster(num_clusters),
-      num_clusters(num_clusters)
-    {}
+  ClusterResult(uint32_t num_clusters)
+      : nth_cluster(num_clusters)
+      , num_clusters(num_clusters)
+  {
+    printf("num_clusters: %u", num_clusters);
+  }
 
   auto count_and_sort_by_population(bool do_sort = true)
-  { 
+  {
     const auto population_of_cluster = _count_cluster_populations();
 
     for (uint32_t n = 0; n < num_clusters; n++) {
@@ -113,7 +111,7 @@ struct ClusterResult {
 inline auto create_normalized_image(const u8 *rgb_bytes, int w, int h) -> std::vector<Color>
 {
   std::vector<Color> pixels(w * h);
-// #pragma omp parallel
+#pragma omp parallel
   for (int i = 0; i < w * h; i++) {
     pixels[i] = Color{ f64(rgb_bytes[i * NUM_CHANNELS]) * NORMALIZE_COLOR_FACTOR,
                        f64(rgb_bytes[i * NUM_CHANNELS + 1]) * NORMALIZE_COLOR_FACTOR,
@@ -136,7 +134,7 @@ inline auto cluster_colors(const LoadedImage &img, uint32_t num_clusters, bool s
 {
   dkm::clustering_parameters<f64> params(num_clusters);
   params.set_random_seed(0xdeadc0de);
-  params.set_max_iteration(1);
+  params.set_max_iteration(2);
 
 #if defined(ENABLE_OPENMP)
   auto [mean_of_cluster, cluster_of_pixel] = dkm::kmeans_lloyd_parallel(img.pixels, params);
@@ -152,19 +150,20 @@ inline auto cluster_colors(const LoadedImage &img, uint32_t num_clusters, bool s
   return result;
 }
 
-inline auto create_cluster_strip_image(const ClusterResult &result, uint32_t num_clusters) -> std::vector<ColorRGB8>
-{
-  const size_t num_pixels_per_strip = STRIP_IMAGE_HEIGHT_PER_CLUSTER * STRIP_IMAGE_WIDTH;
-  const size_t img_height = num_clusters * STRIP_IMAGE_HEIGHT_PER_CLUSTER;
+// inline auto create_cluster_strip_image(const ClusterResult &result, uint32_t num_clusters)
+//     -> std::vector<ColorRGB8>
+// {
+//   const size_t num_pixels_per_strip = STRIP_IMAGE_HEIGHT_PER_CLUSTER * STRIP_IMAGE_WIDTH;
+//   const size_t img_height = num_clusters * STRIP_IMAGE_HEIGHT_PER_CLUSTER;
 
-  std::vector<ColorRGB8> cluster_strip_image(num_clusters * STRIP_IMAGE_WIDTH * img_height *
-                                             3); // 3 = num channel
-  for (size_t n = 0; n < num_clusters; n++) {
-    const auto cluster = result.nth_cluster[n];
+//   std::vector<ColorRGB8> cluster_strip_image(num_clusters * STRIP_IMAGE_WIDTH * img_height *
+//                                              3); // 3 = num channel
+//   for (size_t n = 0; n < num_clusters; n++) {
+//     const auto cluster = result.nth_cluster[n];
 
-    ColorRGB8 *start = cluster_strip_image.data() + (n * num_pixels_per_strip);
-    fill_with_color_rgb8(result.mean_color_of_cluster[cluster], start, num_pixels_per_strip);
-  }
+//     ColorRGB8 *start = cluster_strip_image.data() + (n * num_pixels_per_strip);
+//     fill_with_color_rgb8(result.mean_color_of_cluster[cluster], start, num_pixels_per_strip);
+//   }
 
-  return cluster_strip_image;
-}
+//   return cluster_strip_image;
+// }

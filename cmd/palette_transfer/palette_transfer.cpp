@@ -1,8 +1,6 @@
 #define STB_IMAGE_IMPLEMENTATION 1
 #define STB_IMAGE_WRITE_IMPLEMENTATION 1
 
-#define FLAG_NUM_CLUSTERS 3
-
 #include <domcolor/argparse.hpp>
 #include <domcolor/dkm_parallel.hpp>
 #include <domcolor/domcolor.h>
@@ -71,12 +69,14 @@ int main(int ac, const char **av)
       .required();
   ap.add_argument("-o", "--output-file").help("output file path").required();
   ap.add_argument("-k", "--num-clusters")
-      .help("number of clusters in the palette")
-      .default_value(uint32_t(5));
+      .help("number of clusters in the palette").required();
 
   ap.parse_args(ac, av);
 
   auto num_clusters = ap.get<uint32_t>("num-clusters");
+
+  PLOGI.printf("num_clusters = %u", num_clusters);
+  fflush(stdout);
 
   auto source_cluster =
       create_palette_from_file(fs::path(ap.get<std::string>("palette-source")), num_clusters);
@@ -86,6 +86,7 @@ int main(int ac, const char **av)
   // Load the destination image again and map clusters.
   auto destination_image = load_image(fs::path(ap.get<std::string>("palette-target")));
 
+  #pragma omp parallel
   for (int y = 0; y < destination_image.height; y++) {
     for (int x = 0; x < destination_image.width; x++) {
       int pixel_index = y * destination_image.width + x;
@@ -97,5 +98,5 @@ int main(int ac, const char **av)
 
   destination_image.write_to_file(fs::path(ap.get<std::string>("output-file")));
 
-  PLOGI.printf("DONE creating cluster strip image");
+  PLOGI.printf("DONE creating paletted image");
 }
