@@ -59,24 +59,31 @@ struct LoadedImage {
     auto file_path_str = output_file.u8string();
 
     stbi_write_png(file_path_str.c_str(),
-                   STRIP_IMAGE_WIDTH,
-                   STRIP_IMAGE_HEIGHT,
+                   width,
+                   height,
                    3,
                    reinterpret_cast<void *>(unnormalized.data()),
-                   sizeof(ColorRGB8) * STRIP_IMAGE_WIDTH);
+                   sizeof(ColorRGB8) * width);
   }
 };
 
 struct ClusterResult {
   std::vector<Color> mean_color_of_cluster;
   std::vector<uint32_t> cluster_of_pixel;
-  std::array<uint32_t, NUM_CLUSTERS> nth_cluster; // Clusters sorted by population in decreasing order
+  std::vector<uint32_t> nth_cluster; // Clusters sorted by population in decreasing order
+ 
+  uint32_t num_clusters;
+
+  ClusterResult(uint32_t num_clusters) : 
+      nth_cluster(num_clusters),
+      num_clusters(num_clusters)
+    {}
 
   auto count_and_sort_by_population(bool do_sort = true)
-  {
+  { 
     const auto population_of_cluster = _count_cluster_populations();
 
-    for (uint32_t n = 0; n < NUM_CLUSTERS; n++) {
+    for (uint32_t n = 0; n < num_clusters; n++) {
       nth_cluster[n] = n;
     }
 
@@ -89,9 +96,9 @@ struct ClusterResult {
     });
   }
 
-  auto _count_cluster_populations() -> std::array<size_t, NUM_CLUSTERS>
+  auto _count_cluster_populations() -> std::vector<size_t>
   {
-    std::array<size_t, NUM_CLUSTERS> population_of_cluster{};
+    std::vector<size_t> population_of_cluster(num_clusters);
 
 #if defined(ENABLE_OPENMP)
 #  pragma omp parallel for
@@ -106,7 +113,7 @@ struct ClusterResult {
 inline auto create_normalized_image(const u8 *rgb_bytes, int w, int h) -> std::vector<Color>
 {
   std::vector<Color> pixels(w * h);
-#pragma omp parallel
+// #pragma omp parallel
   for (int i = 0; i < w * h; i++) {
     pixels[i] = Color{ f64(rgb_bytes[i * NUM_CHANNELS]) * NORMALIZE_COLOR_FACTOR,
                        f64(rgb_bytes[i * NUM_CHANNELS + 1]) * NORMALIZE_COLOR_FACTOR,
@@ -138,23 +145,21 @@ inline auto cluster_colors(const LoadedImage &img, uint32_t num_clusters, bool s
 #endif
 
   // Find out which cluster most of the points are assigned to.
-  auto count_of_label = std::array<int, NUM_CLUSTERS>{};
-  for (size_t label : cluster_of_pixel) {
-    count_of_label[label]++;
-  }
-  auto result = ClusterResult{ std::move(mean_of_cluster), std::move(cluster_of_pixel) };
+  ClusterResult result(num_clusters);
+  result.mean_color_of_cluster = std::move(mean_of_cluster);
+  result.cluster_of_pixel = std::move(cluster_of_pixel);
   result.count_and_sort_by_population(sort);
   return result;
 }
 
-inline auto create_cluster_strip_image(const ClusterResult &result) -> std::vector<ColorRGB8>
+inline auto create_cluster_strip_image(const ClusterResult &result, uint32_t num_clusters) -> std::vector<ColorRGB8>
 {
   const size_t num_pixels_per_strip = STRIP_IMAGE_HEIGHT_PER_CLUSTER * STRIP_IMAGE_WIDTH;
-  const size_t img_height = NUM_CLUSTERS * STRIP_IMAGE_HEIGHT_PER_CLUSTER;
+  const size_t img_height = num_clusters * STRIP_IMAGE_HEIGHT_PER_CLUSTER;
 
-  std::vector<ColorRGB8> cluster_strip_image(NUM_CLUSTERS * STRIP_IMAGE_WIDTH * img_height *
+  std::vector<ColorRGB8> cluster_strip_image(num_clusters * STRIP_IMAGE_WIDTH * img_height *
                                              3); // 3 = num channel
-  for (size_t n = 0; n < NUM_CLUSTERS; n++) {
+  for (size_t n = 0; n < num_clusters; n++) {
     const auto cluster = result.nth_cluster[n];
 
     ColorRGB8 *start = cluster_strip_image.data() + (n * num_pixels_per_strip);

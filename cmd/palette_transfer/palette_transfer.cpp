@@ -89,13 +89,13 @@ int main(int ac, const char **av)
   for (int y = 0; y < destination_image.height; y++) {
     for (int x = 0; x < destination_image.width; x++) {
       int pixel_index = y * destination_image.width + x;
-      auto pixel_source_cluster = source_cluster.cluster_of_pixel[pixel_index];
-      auto new_pixel_color = destination_cluster.mean_color_of_cluster[pixel_source_cluster];
+      auto dest_pixel_cluster = destination_cluster.cluster_of_pixel[pixel_index];
+      auto new_pixel_color = source_cluster.mean_color_of_cluster[dest_pixel_cluster];
       destination_image.pixels[pixel_index] = new_pixel_color;
     }
   }
 
   destination_image.write_to_file(fs::path(ap.get<std::string>("output-file")));
 
-  PLOGI.printf("DONE creating cluster strip image at %s", fs::path(ap.get<std::string>("output-file")));
+  PLOGI.printf("DONE creating cluster strip image");
 }
