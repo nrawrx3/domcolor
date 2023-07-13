@@ -3,9 +3,11 @@
 #include <domcolor/defs.h>
 
 #include "dkm_parallel.hpp"
+#include "stb_image_write.h"
 
 #include <algorithm>
 #include <array>
+#include <filesystem>
 #include <inttypes.h>
 #include <stdbool.h>
 #include <string>
@@ -44,10 +46,29 @@ struct LoadedImage {
   int height;
   int width;
   int channels;
+
+  void write_to_file(std::filesystem::path output_file)
+  {
+    auto unnormalized = std::vector<ColorRGB8>{};
+    unnormalized.reserve(height * width);
+    for (auto color : pixels) {
+      const auto color8 = ColorRGB8::from_normalized(color);
+      unnormalized.push_back(color8);
+    }
+
+    auto file_path_str = output_file.u8string();
+
+    stbi_write_png(file_path_str.c_str(),
+                   STRIP_IMAGE_WIDTH,
+                   STRIP_IMAGE_HEIGHT,
+                   3,
+                   reinterpret_cast<void *>(unnormalized.data()),
+                   sizeof(ColorRGB8) * STRIP_IMAGE_WIDTH);
+  }
 };
 
 struct ClusterResult {
-  std::vector<Color> mean_of_cluster;
+  std::vector<Color> mean_color_of_cluster;
   std::vector<uint32_t> cluster_of_pixel;
   std::array<uint32_t, NUM_CLUSTERS> nth_cluster; // Clusters sorted by population in decreasing order
 
@@ -85,6 +106,7 @@ struct ClusterResult {
 inline auto create_normalized_image(const u8 *rgb_bytes, int w, int h) -> std::vector<Color>
 {
   std::vector<Color> pixels(w * h);
+#pragma omp parallel
   for (int i = 0; i < w * h; i++) {
     pixels[i] = Color{ f64(rgb_bytes[i * NUM_CHANNELS]) * NORMALIZE_COLOR_FACTOR,
                        f64(rgb_bytes[i * NUM_CHANNELS + 1]) * NORMALIZE_COLOR_FACTOR,
@@ -103,10 +125,11 @@ inline auto fill_with_color_rgb8(Color color, ColorRGB8 *out_buffer, size_t num_
   std::fill(out_buffer, out_buffer + num_pixels, c);
 }
 
-inline auto cluster_colors(const LoadedImage &img, bool sort = true) -> ClusterResult
+inline auto cluster_colors(const LoadedImage &img, uint32_t num_clusters, bool sort = true) -> ClusterResult
 {
-  dkm::clustering_parameters<f64> params(NUM_CLUSTERS);
+  dkm::clustering_parameters<f64> params(num_clusters);
   params.set_random_seed(0xdeadc0de);
+  params.set_max_iteration(1);
 
 #if defined(ENABLE_OPENMP)
   auto [mean_of_cluster, cluster_of_pixel] = dkm::kmeans_lloyd_parallel(img.pixels, params);
@@ -120,7 +143,7 @@ inline auto cluster_colors(const LoadedImage &img, bool sort = true) -> ClusterR
     count_of_label[label]++;
   }
   auto result = ClusterResult{ std::move(mean_of_cluster), std::move(cluster_of_pixel) };
-  result.count_and_sort_by_population();
+  result.count_and_sort_by_population(sort);
   return result;
 }
 
@@ -135,7 +158,7 @@ inline auto create_cluster_strip_image(const ClusterResult &result) -> std::vect
     const auto cluster = result.nth_cluster[n];
 
     ColorRGB8 *start = cluster_strip_image.data() + (n * num_pixels_per_strip);
-    fill_with_color_rgb8(result.mean_of_cluster[cluster], start, num_pixels_per_strip);
+    fill_with_color_rgb8(result.mean_color_of_cluster[cluster], start, num_pixels_per_strip);
   }
 
   return cluster_strip_image;

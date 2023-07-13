@@ -8,3 +8,4 @@ endif()
 
 add_subdirectory(domcolor_example)
 add_subdirectory(domcolor_benchmark)
+add_subdirectory(palette_transfer)

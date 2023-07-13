@@ -6,5 +6,3 @@
 #include <array>
 #include <optional>
 #include <plog/Log.h>
-
-

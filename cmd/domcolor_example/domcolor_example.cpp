@@ -54,10 +54,10 @@ int main(int ac, const char **av)
   free(loaded_bytes);
   loaded_bytes = nullptr;
 
-  auto result = cluster_colors(loaded_image);
+  auto result = cluster_colors(loaded_image, NUM_CLUSTERS);
 
-  for (size_t cluster = 0; cluster < result.mean_of_cluster.size(); cluster++) {
-    auto mean = ColorRGB8::from_normalized(result.mean_of_cluster[cluster]);
+  for (size_t cluster = 0; cluster < result.mean_color_of_cluster.size(); cluster++) {
+    auto mean = ColorRGB8::from_normalized(result.mean_color_of_cluster[cluster]);
     printf("Cluster: %zu, Mean color: %u, %u, %u\n", cluster, mean.r, mean.g, mean.b);
   }
 
