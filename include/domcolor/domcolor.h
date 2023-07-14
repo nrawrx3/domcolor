@@ -13,10 +13,6 @@
 #include <string>
 #include <vector>
 
-#if !defined(FLAG_NUM_CLUSTERS)
-#  define FLAG_NUM_CLUSTERS 2
-#endif
-
 using f64 = double;
 using u8 = uint8_t;
 

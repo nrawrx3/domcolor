@@ -19,8 +19,11 @@ auto load_image(fs::path file) -> LoadedImage
     .filepath = file.u8string(),
   };
 
-  auto loaded_bytes =
-      stbi_load(loaded_image.filepath.c_str(), &loaded_image.width, &loaded_image.height, &loaded_image.channels, STBI_rgb);
+  auto loaded_bytes = stbi_load(loaded_image.filepath.c_str(),
+                                &loaded_image.width,
+                                &loaded_image.height,
+                                &loaded_image.channels,
+                                STBI_rgb);
 
   if (loaded_bytes == nullptr) {
     PLOGE.printf("failed to load image from given file: %s", loaded_image.filepath.c_str());
@@ -68,15 +71,13 @@ int main(int ac, const char **av)
       .help("path to destination image which will be converted")
       .required();
   ap.add_argument("-o", "--output-file").help("output file path").required();
-  ap.add_argument("-k", "--num-clusters")
-      .help("number of clusters in the palette").required();
+  ap.add_argument("-k", "--num-clusters").help("number of clusters in the palette").required();
 
   ap.parse_args(ac, av);
 
   auto num_clusters = ap.get<uint32_t>("num-clusters");
 
   PLOGI.printf("num_clusters = %u", num_clusters);
-  fflush(stdout);
 
   auto source_cluster =
       create_palette_from_file(fs::path(ap.get<std::string>("palette-source")), num_clusters);
@@ -86,7 +87,7 @@ int main(int ac, const char **av)
   // Load the destination image again and map clusters.
   auto destination_image = load_image(fs::path(ap.get<std::string>("palette-target")));
 
-  #pragma omp parallel
+#pragma omp parallel
   for (int y = 0; y < destination_image.height; y++) {
     for (int x = 0; x < destination_image.width; x++) {
       int pixel_index = y * destination_image.width + x;
