@@ -75,7 +75,9 @@ int main(int ac, const char **av)
 
   ap.parse_args(ac, av);
 
-  auto num_clusters = ap.get<uint32_t>("num-clusters");
+  auto num_clusters_str = ap.get<std::string>("num-clusters");
+
+  auto num_clusters = std::stoi(num_clusters_str);
 
   PLOGI.printf("num_clusters = %u", num_clusters);
 
